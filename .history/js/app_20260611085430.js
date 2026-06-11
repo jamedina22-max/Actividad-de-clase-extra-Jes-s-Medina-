@@ -1,0 +1,137 @@
+// js/app.js
+
+document.addEventListener("DOMContentLoaded", async () => {
+    // Inicializar Iconos Lucide
+    lucide.createIcons();
+    
+    // Cargar productos de la API si aplica
+    await checkAndLoadAPIProducts();
+    
+    // Inicializar Tema (Claro/Oscuro)
+    initTheme();
+    
+    // Escuchar cambios de red (Online/Offline)
+    window.addEventListener('online', updateNetworkStatus);
+    window.addEventListener('offline', updateNetworkStatus);
+    updateNetworkStatus();
+
+    // Renderizar la landing page por defecto al iniciar
+    navigate('landing');
+});
+
+// --- RUTA/NAVEGACIÓN SIMULADA (SPA) ---
+function navigate(view) {
+    const main = document.getElementById('main-content');
+    const user = JSON.parse(sessionStorage.getItem(KEYS.CURRENT_USER));
+
+    // Control de Accesos / Roles (Guardias de seguridad)
+    if (view === 'admin' && (!user || user.role !== 'admin')) {
+        alert("Acceso denegado. Se requieren permisos de Administrador.");
+        navigate('landing');
+        return;
+    }
+
+    switch(view) {
+        case 'landing':
+            main.innerHTML = renderLandingPage();
+            break;
+        case 'catalog':
+            main.innerHTML = `
+                <div class="text-center py-12">
+                    <h2 class="text-3xl font-bold mb-4">Catálogo de Productos</h2>
+                    <p class="text-gray-500">Filtros, buscador y cuadrícula dinámica aquí...</p>
+                </div>`;
+            // Aquí llamarías a la función constructora del catálogo de js/catalog.js
+            break;
+        case 'admin':
+            main.innerHTML = `
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+                    <h2 class="text-2xl font-bold mb-4 text-red-500">Panel de Administración</h2>
+                    <p>Métricas de venta, CRUD de inventario y colas de espera offline aquí.</p>
+                </div>`;
+            break;
+        case 'login':
+            main.innerHTML = renderLogin();
+            break;
+        default:
+            main.innerHTML = `<h2 class="text-xl">404 - Vista no encontrada</h2>`;
+    }
+    
+    // Re-renderizar iconos inyectados dinámicamente
+    lucide.createIcons();
+}
+
+// --- VISTA: LANDING PAGE TEMPLATE ---
+function renderLandingPage() {
+    const products = getLocalData(KEYS.PRODUCTS).slice(0, 4); // Top 4 destacados
+    
+    let productCards = products.map(p => `
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow hover:shadow-lg transition">
+            <img src="${p.image}" class="h-40 mx-auto object-contain mb-4" alt="${p.title}">
+            <h4 class="font-semibold truncate">${p.title}</h4>
+            <p class="text-indigo-600 font-bold mt-2">$${p.price}</p>
+        </div>
+    `).join('');
+
+    return `
+        <section class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-3xl p-8 md:p-16 text-center mb-12 shadow-xl">
+            <h1 class="text-4xl md:text-6xl font-extrabold mb-4">¡Descubre el Futuro del E-Commerce!</h1>
+            <p class="text-lg md:text-xl mb-6 opacity-90">Navega, compra y gestiona incluso sin conexión a internet.</p>
+            <button onclick="navigate('catalog')" class="bg-white text-indigo-600 font-bold px-8 py-3 rounded-full shadow-md hover:bg-gray-100 transition">Ver Catálogo</button>
+        </section>
+
+        <section class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            <div class="p-6 bg-white dark:bg-gray-800 rounded-xl shadow text-center">
+                <i data-lucide="zap" class="w-10 h-10 mx-auto text-yellow-500 mb-2"></i>
+                <h3 class="font-bold text-lg">PWA Offline</h3>
+                <p class="text-sm text-gray-500">¿Sin internet? No hay problema. Sigue comprando sin interrupciones.</p>
+            </div>
+            <div class="p-6 bg-white dark:bg-gray-800 rounded-xl shadow text-center">
+                <i data-lucide="shield-check" class="w-10 h-10 mx-auto text-green-500 mb-2"></i>
+                <h3 class="font-bold text-lg">Pagos Seguros</h3>
+                <p class="text-sm text-gray-500">Pasarela simulada con encriptación local y alertas instantáneas.</p>
+            </div>
+            <div class="p-6 bg-white dark:bg-gray-800 rounded-xl shadow text-center">
+                <i data-lucide="sliders" class="w-10 h-10 mx-auto text-blue-500 mb-2"></i>
+                <h3 class="font-bold text-lg">Control Total Admin</h3>
+                <p class="text-sm text-gray-500">Panel CRUD avanzado e historial dinámico de ventas.</p>
+            </div>
+        </section>
+
+        <section class="mb-12">
+            <h3 class="text-2xl font-bold mb-6">Productos Destacados</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">${productCards}</div>
+        </section>
+    `;
+}
+
+// --- CONFIGURACIÓN DE TEMA (DARK/LIGHT) ---
+function initTheme() {
+    const toggleBtn = document.getElementById('theme-toggle');
+    let currentTheme = localStorage.getItem(KEYS.THEME) || 'light';
+    
+    if (currentTheme === 'dark') document.documentElement.classList.add('dark');
+
+    toggleBtn.addEventListener('click', () => {
+        if (document.documentElement.classList.contains('dark')) {
+            document.documentElement.classList.remove('dark');
+            localStorage.setItem(KEYS.THEME, 'light');
+        } else {
+            document.documentElement.classList.add('dark');
+            localStorage.setItem(KEYS.THEME, 'dark');
+        }
+    });
+}
+
+// --- DETECTOR ONLINE / OFFLINE ---
+function updateNetworkStatus() {
+    const statusDiv = document.getElementById('connection-status');
+    if (navigator.onLine) {
+        statusDiv.className = "flex items-center space-x-2 text-sm font-medium px-3 py-1 rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
+        statusDiv.innerHTML = `<span class="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse"></span><span>Modo Online</span>`;
+        // Aquí desencadenarías la sincronización de la cola offline hacia las órdenes totales
+    } else {
+        statusDiv.className = "flex items-center space-x-2 text-sm font-medium px-3 py-1 rounded-full bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
+        statusDiv.innerHTML = `<span class="w-2.5 h-2.5 bg-red-500 rounded-full"></span><span>Modo Offline</span>`;
+    }
+}
